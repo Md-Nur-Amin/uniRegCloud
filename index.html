@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>UniReg Cloud</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: '#4f46e5' }, fontFamily: { serif: ['Georgia', 'Times New Roman', 'serif'] } } } }</script>
+</head>
+
+<body class="bg-slate-50 text-slate-800 font-sans">
+  <header class="bg-white border-b sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto flex items-center gap-6 px-4 h-16">
+      <a href="#/" class="font-bold text-brand text-xl">🎓 UniReg Cloud</a>
+      <nav id="nav" class="flex gap-5 text-sm ml-4"></nav>
+      <div id="auth" class="ml-auto flex items-center gap-3 text-sm"></div>
+    </div>
+  </header>
+  <div id="toast"
+    class="hidden fixed top-20 right-4 z-20 bg-amber-100 border border-amber-300 text-amber-900 px-4 py-2 rounded-lg shadow">
+  </div>
+  <main id="app" class="max-w-6xl mx-auto px-4 py-8"></main>
+  <footer class="text-center text-xs text-slate-400 py-8">UniReg Cloud · registration portal for University A, B and C
+  </footer>
+  <script>
+    const $ = s => document.querySelector(s), IC = { CSE: '💻', Business: '📊', Science: '🔬', Humanities: '📖', Arts: '🎨' };
+    let T = sessionStorage.token || null, U = JSON.parse(sessionStorage.user || 'null'), Q = '', D = '', W;
+    const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), 4000) };
+    async function api(p, o = {}) {
+      const r = await fetch('/api/' + p, { method: o.body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(T ? { Authorization: 'Bearer ' + T } : {}) }, body: o.body && JSON.stringify(o.body) });
+      const d = await r.json().catch(() => ({}));
+      if (r.status == 503) toast(d.message || 'Busy, try again');
+      if (r.status === 401 && T && p !== 'logout' && p !== 'login') { T = U = null; sessionStorage.clear(); toast('Session expired. Please log in again.'); location.hash = '#/login' }
+      return { ok: r.ok, s: r.status, d };
+    }
+    const btn = c => c.enrolled ? `<button onclick="drop('${c.id}')" class="border border-rose-300 text-rose-600 px-4 py-1.5 rounded-lg text-sm">Drop</button>`
+      : `<button onclick="enroll('${c.id}')" ${c.left ? '' : 'disabled'} class="bg-brand text-white px-4 py-1.5 rounded-lg text-sm disabled:opacity-40">Enroll</button>`;
+    const cc = c => `<div class="bg-white border rounded-xl p-5 shadow-sm flex flex-col gap-1">
+  <div class="text-xs text-brand font-semibold">${c.code} · ${c.dept} · ${c.credits} credits</div>
+  <a href="#/course/${c.id}" class="font-semibold hover:text-brand">${c.title}</a>
+  <div class="text-sm text-slate-500">${c.instructor} · ${c.time}</div>
+  <div class="flex items-center justify-between mt-auto pt-3"><span class="text-sm ${c.left ? 'text-emerald-600' : 'text-rose-600'}">${c.left ? c.left + ' of ' + c.seats + ' seats left' : 'Seat full'}</span>${btn(c)}</div></div>`;
+
+    async function home() {
+      const { d } = await api('info'); return `
+<section class="grid md:grid-cols-2 gap-8 items-center py-6"><div>
+  <span class="text-xs bg-indigo-100 text-brand px-3 py-1 rounded-full">Registration is open</span>
+  <h1 class="font-serif text-5xl font-bold mt-4 leading-tight">Register Smart,<br><span class="text-brand">Study Ahead</span></h1>
+  <p class="mt-4 text-slate-600 max-w-md">One portal for three universities. Search courses, take your seat and download your payment slip.</p>
+  <div class="mt-6 flex gap-3"><a href="#/login" class="bg-brand text-white px-6 py-3 rounded-lg">Student login →</a><a href="#/about" class="px-6 py-3 rounded-lg border bg-white">About the portal</a></div></div>
+  <div class="bg-gradient-to-br from-indigo-100 to-violet-50 rounded-3xl h-64 flex items-center justify-center text-7xl">🎓📚</div></section>
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white border rounded-xl p-6 text-center shadow-sm my-8">
+  ${[[d.students.toLocaleString(), 'Students'], [d.universities.length, 'Universities'], [d.sections, 'Course sections'], ['First come', 'First served']].map(([n, l]) => `<div><div class="text-2xl font-bold">${n}</div><div class="text-sm text-slate-500">${l}</div></div>`).join('')}</section>
+<h2 class="font-serif text-2xl font-bold mb-4">Popular departments</h2>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4">${Object.entries(d.depts).map(([k, n]) => `<div class="bg-white border rounded-xl p-5 shadow-sm"><div class="text-3xl">${IC[k]}</div><div class="font-semibold mt-2">${k}</div><div class="text-xs text-slate-500">${n} sections</div></div>`).join('')}</div>
+<div class="grid md:grid-cols-2 gap-6 my-8">
+  <div class="bg-indigo-50 rounded-xl p-6"><h3 class="font-serif font-bold text-xl mb-3">Why UniReg Cloud?</h3><ul class="space-y-1 text-sm">${['One login for your university', 'Live seat counts on every course', 'Seats are never given twice', 'Payment slip in one click'].map(x => `<li>✔ ${x}</li>`).join('')}</ul></div>
+  <div class="bg-amber-50 rounded-xl p-6"><h3 class="font-serif font-bold text-xl mb-3">Registration notices</h3><p class="text-sm text-slate-600">Pre-registration opens Monday 9:00 AM for three days. Final registration opens Tuesday 10:00 AM; seats are limited.</p>
+  <div class="flex gap-2 mt-3 flex-wrap">${d.universities.map(x => `<span class="bg-white border rounded-full px-3 py-1 text-xs">${x.name} · ${x.students.toLocaleString()}</span>`).join('')}</div></div></div>
+<div class="bg-brand rounded-2xl p-8 text-white flex flex-wrap gap-4 items-center justify-between"><div><h3 class="font-serif text-2xl font-bold">Ready to register?</h3><p class="text-indigo-100 text-sm">Log in and secure your seats.</p></div><a href="#/login" class="bg-white text-brand px-6 py-3 rounded-lg font-semibold">Get started →</a></div>`}
+
+    const login = () => `<form onsubmit="return doLogin(event)" class="max-w-sm mx-auto bg-white border rounded-2xl p-8 shadow-sm space-y-4">
+  <h2 class="font-serif text-2xl font-bold">Student login</h2>
+  <input id="sid" placeholder="Student ID, e.g. A2026001" class="w-full border rounded-lg px-3 py-2" required>
+  <input id="pw" type="password" placeholder="Password" class="w-full border rounded-lg px-3 py-2" required>
+  <p id="err" class="text-rose-600 text-sm"></p><button class="w-full bg-brand text-white py-2.5 rounded-lg">Log in</button></form>`;
+ 
+async function doLogin(e) {
+  e.preventDefault();
+
+  const err = $('#err');
+  err.textContent = 'Logging in...';
+
+  try {
+    const { ok, s, d } = await api('login', {
+      body: {
+        studentId: $('#sid').value.trim(),
+        password: $('#pw').value
+      }
+    });
+
+    if (!ok) {
+      err.textContent =
+        s === 401 ? 'Invalid student ID or password.' :
+        d.message || d.error || `Login failed (HTTP ${s}).`;
+      return;
+    }
+
+    T = d.token;
+    U = d.student;
+    sessionStorage.token = T;
+    sessionStorage.user = JSON.stringify(U);
+    location.hash = '#/courses';
+
+  } catch (error) {
+    err.textContent = 'Unable to connect to the server. Please try again.';
+    console.error('Login request failed:', error);
+  }
+}
+
+    async function logout() { await api('logout', { body: {} }); T = U = null; sessionStorage.clear(); location.hash = '#/'; route() }
+
+    const courses = () => {
+      setTimeout(loadCourses); return `<h2 class="font-serif text-3xl font-bold mb-4">Find courses</h2>
+  <div class="flex gap-3 mb-5"><input value="${Q}" oninput="Q=this.value;clearTimeout(W);W=setTimeout(loadCourses,300)" placeholder="Search by title or code" class="flex-1 border rounded-lg px-3 py-2">
+  <select onchange="D=this.value;loadCourses()" class="border rounded-lg px-3 bg-white">${['', 'CSE', 'Business', 'Science', 'Humanities', 'Arts'].map(x => `<option value="${x}" ${x == D ? 'selected' : ''}>${x || 'All departments'}</option>`).join('')}</select></div>
+  <div id="list" class="grid md:grid-cols-3 gap-4"></div>`};
+    async function loadCourses() {
+      const { d } = await api(`courses?q=${encodeURIComponent(Q)}&dept=${D}`); const l = $('#list');
+      if (l && Array.isArray(d)) l.innerHTML = d.map(cc).join('') || '<p class="text-slate-500">No courses match your search.</p>'
+    }
+    async function course(id) {
+      const { ok, d: c } = await api('courses/' + id); if (!ok) return '<p>Course not found.</p>';
+      return `<a href="#/courses" class="text-brand text-sm">← All courses</a><div class="bg-white border rounded-2xl p-8 mt-3 max-w-2xl shadow-sm">
+  <div class="text-xs text-brand font-semibold">${c.code} · ${c.dept}</div><h2 class="font-serif text-3xl font-bold mt-1">${c.title}</h2>
+  <dl class="grid grid-cols-2 gap-4 my-6 text-sm">${[['Instructor', c.instructor], ['Schedule', c.time], ['Credits', c.credits], ['Seats left', c.left + ' of ' + c.seats]].map(([a, b]) => `<div><dt class="text-slate-500">${a}</dt><dd class="font-medium">${b}</dd></div>`).join('')}</dl>${btn(c)}</div>`
+    }
+    async function mineP() {
+      const { d } = await api('my-courses'); if (!Array.isArray(d)) return ''; const cr = d.reduce((a, c) => a + c.credits, 0);
+      return `<h2 class="font-serif text-3xl font-bold mb-4">My registration</h2>` + (d.length ? `<div class="grid md:grid-cols-3 gap-4">${d.map(cc).join('')}</div>
+  <div class="mt-6 bg-white border rounded-xl p-5 flex flex-wrap gap-3 items-center justify-between"><span>Total: <b>${cr} credits</b> · Fee: <b>৳${cr * 3500}</b></span>
+  <button onclick="slip()" class="bg-brand text-white px-5 py-2 rounded-lg">Download payment slip</button></div>`
+        : '<p class="text-slate-500">You have no courses yet. <a class="text-brand" href="#/courses">Find courses</a></p>')
+    }
+    async function slip() {
+      const { ok, d } = await api('slip'); if (!ok) return toast('Enroll in a course first to get a slip.');
+      const t = `PAYMENT SLIP ${d.slipNo}\n${d.student} (${d.studentId}), ${d.university}\n\n` + d.courses.map(c => `${c.code}  ${c.title}  ${c.credits} cr`).join('\n') + `\n\nTotal: ${d.totalCredits} credits = BDT ${d.amountBDT}\nIssued: ${d.issued}\n`;
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([t])); a.download = d.slipNo + '.txt'; a.click()
+    }
+    async function about() { const { d } = await api('about'); return `<div class="max-w-2xl"><h2 class="font-serif text-3xl font-bold mb-4">${d.title}</h2>${d.text.map(x => `<p class="text-slate-600 mb-3">${x}</p>`).join('')}</div>` }
+
+    async function enroll(id) {
+      const { s, d } = await api('enroll', { body: { courseId: id } });
+      if (s == 201) toast('✅ Enrolled. Your seat is reserved.'); else if (s != 503) toast(d.error == 'seat_full' ? 'Seat full. Someone else took the last one.' : d.error == 'already_enrolled' ? 'You are already enrolled.' : 'Something went wrong (' + s + ')'); route()
+    }
+    async function drop(id) { await api('drop', { body: { courseId: id } }); route() }
+
+    async function route() {
+      const [h = '', id] = location.hash.slice(2).split('/');
+      if (['courses', 'course', 'mine'].includes(h) && !T) return location.hash = '#/login';
+      $('#nav').innerHTML = [['', 'Home'], ...(T ? [['courses', 'Courses'], ['mine', 'My registration']] : []), ['about', 'About']].map(([k, n]) => `<a href="#/${k}" class="${k == h ? 'text-brand font-semibold' : 'text-slate-600'}">${n}</a>`).join('');
+      $('#auth').innerHTML = T ? `<span class="hidden sm:inline text-slate-500">${U.name} · ${U.university}</span><button onclick="logout()" class="border px-3 py-1.5 rounded-lg">Log out</button>` : `<a href="#/login" class="bg-brand text-white px-4 py-2 rounded-lg">Student login</a>`;
+      const f = { '': home, login, courses, course, mine: mineP, about }[h] || home;
+      $('#app').innerHTML = await f(id) || '';
+    }
+    addEventListener('hashchange', route); route();
+  </script>
+</body>
+
+</html>
